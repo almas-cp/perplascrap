@@ -31,6 +31,31 @@ async def load_cookies(context):
         print(f"⚠ No cookie file found at {COOKIE_FILE}")
         return False
 
+async def handle_response(response):
+    """Capture and log API responses"""
+    if 'api' in response.url or 'search' in response.url:
+        print(f"\n�  Captured Response:")
+        print(f"   URL: {response.url}")
+        print(f"   Status: {response.status}")
+        print(f"   Headers: {json.dumps(dict(response.headers), indent=2)}")
+        
+        try:
+            response_body = await response.text()
+            print(f"   Body Preview: {response_body[:200]}...")
+            
+            # Save to file
+            response_data = {
+                'url': response.url,
+                'status': response.status,
+                'headers': dict(response.headers),
+                'body': response_body
+            }
+            with open('captured_response.json', 'w') as f:
+                json.dump(response_data, f, indent=2)
+            print(f"   ✓ Saved to captured_response.json\n")
+        except Exception as e:
+            print(f"   ⚠ Could not read response body: {e}\n")
+
 async def capture_request(route, request):
     """Capture and log API requests"""
     if 'api' in request.url or 'search' in request.url:
@@ -106,6 +131,9 @@ async def main():
             # Enable request interception
             await page.route("**/*", capture_request)
             
+            # Enable response capture
+            page.on("response", handle_response)
+            
             print("\n=== Playwright Cookie Manager & Request Capturer ===\n")
             
             # Try to load existing cookies
@@ -136,26 +164,19 @@ async def main():
                 print("  Continuing anyway...")
             
             # Wait for user to interact with the page
-            print("\n⏳ Browser is open. Click the Generate button to capture the request.")
-            print("   The request will be captured and saved automatically.")
-            print("   Waiting for 60 seconds...")
+            print("\n⏳ Browser is open. Click the Generate button to capture request & response.")
+            print("   Requests and responses will be saved automatically.")
+            print("   Browser will stay open - close it manually when done.\n")
             
-            # Keep the browser open for manual interaction
-            await asyncio.sleep(60)
+            # Keep the browser open indefinitely
+            while True:
+                await asyncio.sleep(1)
             
-            # Save cookies before closing
-            print("\n→ Saving cookies...")
+        except KeyboardInterrupt:
+            print("\n\n→ Saving cookies before exit...")
             await save_cookies(context)
-            
-            print("\n✓ Done! Cookies are saved for next run.")
-            print("  Run this script again to see cookies loaded automatically.\n")
-            
-            # Keep browser open for a few more seconds to see the result
-            await asyncio.sleep(3)
-            
+            print("✓ Cookies saved!")
         finally:
-            # Close the browser
-            await browser.close()
             print("✓ Browser closed")
 
 if __name__ == '__main__':
